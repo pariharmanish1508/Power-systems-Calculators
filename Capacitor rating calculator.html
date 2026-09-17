@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Capacitor Rating Calculation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS CDN for styling -->
+    <script>
+      tailwind = { config: {
+        theme: {
+          extend: {
+            colors: {
+              ink:    '#0E1B23',  /* page background, recessed panels */
+              panel:  '#16262F',  /* card surfaces */
+              panel2: '#1C2E38',  /* glass/meter surfaces */
+              line:   '#28394A',  /* borders */
+              copper: '#E8A33D',  /* primary accent + "before" state */
+              good:   '#6FBF8B',  /* "after / target" state */
+              cap:    '#A78BFA',  /* capacitor-specific values */
+              paper:  '#EDEBE3',  /* primary readout text */
+              dim:    '#8FA0AC',  /* secondary/label text */
+            },
+            fontFamily: {
+              sans: ['IBM Plex Sans','ui-sans-serif','system-ui','sans-serif'],
+              mono: ['IBM Plex Mono','ui-monospace','SFMono-Regular','monospace'],
+            }
+          }
+        }
+      } }
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      input[type="range"] { accent-color: currentColor; }
+      input[type="range"]::-webkit-slider-thumb { border: 2px solid #0E1B23; }
+    </style>
+</head>
+<body class="bg-ink text-dim font-sans min-h-screen p-3 sm:p-6">
+
+    <div class="max-w-5xl mx-auto p-4 sm:p-6 bg-panel border border-line shadow-2xl rounded-2xl my-6 sm:my-10">
+        <!-- Header -->
+        <header class="border-b border-line pb-4 mb-6 flex items-start gap-3">
+            <span class="w-1.5 h-9 rounded-sm bg-copper mt-0.5 shrink-0"></span>
+            <div>
+                <h1 class="text-2xl sm:text-3xl font-semibold text-paper tracking-tight">Capacitor Rating Calculation</h1>
+                <p class="text-xs sm:text-sm text-dim mt-1">Industrial power factor correction, digital meter monitoring, and phase sizing.</p>
+            </div>
+        </header>
+
+        <!-- Main Responsive Grid Layout -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
+            <!-- Input Panel -->
+            <div class="space-y-4 bg-ink p-4 sm:p-5 rounded-xl border border-line">
+                <h2 class="text-lg sm:text-xl font-semibold text-copper">1. System Parameters</h2>
+
+                <div>
+                    <label class="block text-sm font-medium text-dim">System Type</label>
+                    <select id="systemType" class="w-full mt-1 p-2 border border-line rounded-lg bg-panel2 text-paper focus:outline-none focus:border-copper text-sm" onchange="calculatePFC()">
+                        <option value="3phase">3-Phase System</option>
+                        <option value="1phase">Single-Phase System</option>
+                    </select>
+                    <p class="text-xs text-dim/70 mt-1">Select network configuration for current and phase division.</p>
+                </div>
+
+                <!-- Active Power & Unit Selection -->
+                <div>
+                    <label class="block text-sm font-medium text-dim">Active Power Load</label>
+                    <div class="grid grid-cols-3 gap-2 mt-1">
+                        <input type="number" id="activePower" value="250" min="0.001" step="any" class="col-span-2 p-2 border border-line rounded-lg bg-panel2 text-paper font-mono focus:outline-none focus:border-copper text-sm" oninput="calculatePFC()">
+                        <select id="activeUnit" class="p-2 border border-line rounded-lg bg-panel2 text-paper focus:outline-none focus:border-copper text-sm" onchange="calculatePFC()">
+                            <option value="kw">kW</option>
+                            <option value="mw">MW</option>
+                        </select>
+                    </div>
+                    <p class="text-xs text-dim/70 mt-1">Real power consumed by industrial load (unlimited scale).</p>
+                </div>
+
+                <!-- Voltage & Unit Selection -->
+                <div>
+                    <label class="block text-sm font-medium text-dim" id="voltageLabel">System Voltage</label>
+                    <div class="grid grid-cols-3 gap-2 mt-1">
+                        <input type="number" id="voltage" value="415" min="0.1" step="any" class="col-span-2 p-2 border border-line rounded-lg bg-panel2 text-paper font-mono focus:outline-none focus:border-copper text-sm" oninput="calculatePFC()">
+                        <select id="voltageUnit" class="p-2 border border-line rounded-lg bg-panel2 text-paper focus:outline-none focus:border-copper text-sm" onchange="calculatePFC()">
+                            <option value="v">V</option>
+                            <option value="kv">kV</option>
+                        </select>
+                    </div>
+                    <p class="text-xs text-dim/70 mt-1">Operating voltage level across lines or phase-to-neutral.</p>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-dim">Reactive Power Output Unit Scale</label>
+                    <select id="reactiveUnit" class="w-full mt-1 p-2 border border-line rounded-lg bg-panel2 text-paper focus:outline-none focus:border-copper text-sm" onchange="calculatePFC()">
+                        <option value="kvar">kVAr (Kilovolt-Ampere Reactive)</option>
+                        <option value="mvar">MVAr (Megavolt-Ampere Reactive)</option>
+                    </select>
+                    <p class="text-xs text-dim/70 mt-1">Choose output unit scale for reactive power compensation.</p>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-dim">System Frequency (Hz)</label>
+                    <select id="frequency" class="w-full mt-1 p-2 border border-line rounded-lg bg-panel2 text-paper focus:outline-none focus:border-copper text-sm" onchange="calculatePFC()">
+                        <option value="50">50 Hz</option>
+                        <option value="60">60 Hz</option>
+                    </select>
+                    <p class="text-xs text-dim/70 mt-1">AC supply grid frequency standard.</p>
+                </div>
+
+                <h2 class="text-lg sm:text-xl font-semibold text-copper pt-2">2. Power Factor Targets</h2>
+                <div>
+                    <label class="block text-sm font-medium text-dim">Initial Power Factor: <span id="initialPfVal" class="text-copper font-mono font-bold">0.75</span></label>
+                    <input type="range" id="initialPf" min="0.50" max="0.95" step="0.01" value="0.75" class="w-full mt-2 text-copper" style="accent-color:#E8A33D" oninput="calculatePFC()">
+                    <p class="text-xs text-dim/70 mt-1">Uncorrected lagging power factor before capacitor installation.</p>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-dim">Target Power Factor: <span id="targetPfVal" class="text-good font-mono font-bold">0.95</span></label>
+                    <input type="range" id="targetPf" min="0.85" max="1.00" step="0.01" value="0.95" class="w-full mt-2 text-good" style="accent-color:#6FBF8B" oninput="calculatePFC()">
+                    <p class="text-xs text-dim/70 mt-1">Desired power factor (starts at min 0.85, cannot go below initial PF).</p>
+                </div>
+            </div>
+
+            <!-- Output Results Panel -->
+            <div class="space-y-6">
+                <!-- Performance Box -->
+                <div class="bg-ink border border-line p-4 sm:p-5 rounded-xl shadow-inner">
+                    <h2 class="text-lg sm:text-xl font-semibold text-copper mb-4">Performance &amp; Sizing</h2>
+                    <div class="space-y-3 text-sm">
+                        <div class="flex justify-between items-baseline border-b border-line pb-2">
+                            <span class="text-dim">Initial Line Current:</span>
+                            <span class="font-mono font-bold text-copper" id="resInitialCurrent">0 A</span>
+                        </div>
+                        <div class="flex justify-between items-baseline border-b border-line pb-2">
+                            <span class="text-dim">Improved Line Current:</span>
+                            <span class="font-mono font-bold text-good" id="resTargetCurrent">0 A</span>
+                        </div>
+                        <div class="flex justify-between items-baseline border-b border-line pb-2">
+                            <span class="text-dim">Total Capacitor Bank Rating:</span>
+                            <span class="font-mono font-bold text-cap" id="resTotalKvar">0 kVAr</span>
+                        </div>
+                        <div class="flex justify-between items-baseline">
+                            <span class="text-dim">Capacitance in Each Phase:</span>
+                            <span class="font-mono font-bold text-cap" id="resCapacitance">0 µF</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Digital Meter Glass Representation (Before & After) -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Before Compensation Meter -->
+                    <div class="bg-panel2/60 backdrop-blur-md border border-copper/30 p-4 rounded-xl shadow-lg flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs font-semibold tracking-wide text-copper">Meter — Before Correction</span>
+                            <div class="mt-2 space-y-1 text-xs">
+                                <div class="flex justify-between"><span class="text-dim">Active (P):</span> <span class="font-mono text-paper" id="meterBeforeP">0 kW</span></div>
+                                <div class="flex justify-between"><span class="text-dim">Reactive (Q1):</span> <span class="font-mono text-copper" id="meterBeforeQ">0 kVAr</span></div>
+                                <div class="flex justify-between"><span class="text-dim">Apparent (S1):</span> <span class="font-mono text-paper" id="meterBeforeS">0 kVA</span></div>
+                            </div>
+                        </div>
+                        <div class="mt-3 pt-2 border-t border-line text-right">
+                            <span class="text-xs text-dim">PF: <strong class="text-copper font-mono" id="meterBeforePF">0.75</strong></span>
+                        </div>
+                    </div>
+
+                    <!-- After Compensation Meter -->
+                    <div class="bg-panel2/60 backdrop-blur-md border border-good/30 p-4 rounded-xl shadow-lg flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs font-semibold tracking-wide text-good">Meter — After Correction</span>
+                            <div class="mt-2 space-y-1 text-xs">
+                                <div class="flex justify-between"><span class="text-dim">Active (P):</span> <span class="font-mono text-paper" id="meterAfterP">0 kW</span></div>
+                                <div class="flex justify-between"><span class="text-dim">Reactive (Q2):</span> <span class="font-mono text-good" id="meterAfterQ">0 kVAr</span></div>
+                                <div class="flex justify-between"><span class="text-dim">Apparent (S2):</span> <span class="font-mono text-paper" id="meterAfterS">0 kVA</span></div>
+                            </div>
+                        </div>
+                        <div class="mt-3 pt-2 border-t border-line text-right">
+                            <span class="text-xs text-dim">PF: <strong class="text-good font-mono" id="meterAfterPF">0.95</strong></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Power Triangle Graphic with Legend Above -->
+                <div class="bg-ink border border-line p-4 sm:p-5 rounded-xl shadow-inner">
+                    <h2 class="text-lg sm:text-xl font-semibold text-copper mb-1">Power Triangle &amp; Compensation</h2>
+                    <p class="text-xs text-dim/80 mb-3">Vector representation mapping Q1, Q2, and Qc.</p>
+
+                    <!-- Legend Above Triangle -->
+                    <div class="flex flex-wrap items-center justify-center gap-4 mb-3 p-2 bg-panel2/60 border border-line rounded-lg text-xs">
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-3 h-3 bg-copper rounded-sm inline-block"></span>
+                            <span class="text-copper font-medium">Q1 (Initial)</span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-3 h-3 bg-good rounded-sm inline-block"></span>
+                            <span class="text-good font-medium">Q2 (Target)</span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-3 h-3 bg-cap rounded-sm inline-block"></span>
+                            <span class="text-cap font-medium">Qc (Capacitor)</span>
+                        </div>
+                    </div>
+
+                    <!-- Responsive SVG Container -->
+                    <div class="flex flex-col items-center bg-panel2/40 p-3 rounded-lg border border-line overflow-x-auto">
+                        <svg id="powerTriangleSvg" width="300" height="190" viewBox="0 0 340 190" class="overflow-visible max-w-full h-auto">
+                            <!-- Axes -->
+                            <line x1="40" y1="150" x2="310" y2="150" stroke="#3A4C5D" stroke-width="1.5" />
+                            <line x1="40" y1="20" x2="40" y2="150" stroke="#3A4C5D" stroke-width="1.5" />
+
+                            <!-- Initial Q1 vector line -->
+                            <line id="svgQ1Line" x1="240" y1="150" x2="240" y2="40" stroke="#E8A33D" stroke-width="2" stroke-dasharray="4" />
+                            <!-- Target Q2 vector line -->
+                            <line id="svgQ2Line" x1="240" y1="150" x2="240" y2="90" stroke="#6FBF8B" stroke-width="2" />
+
+                            <!-- Capacitor Compensation Vector (Qc) -->
+                            <line id="svgQcLine" x1="285" y1="40" x2="285" y2="90" stroke="#A78BFA" stroke-width="3" />
+                            <!-- Top cap for double-sided arrow -->
+                            <line id="svgQcCapTop" x1="280" y1="40" x2="290" y2="40" stroke="#A78BFA" stroke-width="2" />
+                            <!-- Bottom cap for double-sided arrow -->
+                            <line id="svgQcCapBot" x1="280" y1="90" x2="290" y2="90" stroke="#A78BFA" stroke-width="2" />
+
+                            <!-- Initial Apparent Power S1 Hypotenuse -->
+                            <line id="svgS1Line" x1="40" y1="150" x2="240" y2="40" stroke="#E8A33D" stroke-width="2" />
+                            <!-- Improved Apparent Power S2 Hypotenuse -->
+                            <line id="svgS2Line" x1="40" y1="150" x2="240" y2="90" stroke="#6FBF8B" stroke-width="2" />
+
+                            <!-- Labels -->
+                            <text id="svgActiveLabel" x="140" y="172" fill="#8FA0AC" font-size="10" text-anchor="middle">Active Power</text>
+                            <text x="300" y="68" fill="#A78BFA" font-size="10" font-weight="bold">Qc</text>
+                            <text x="215" y="35" fill="#E8A33D" font-size="10" font-weight="bold">Q1</text>
+                            <text x="215" y="105" fill="#6FBF8B" font-size="10" font-weight="bold">Q2</text>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dedicated Ending Line: Capacitor Bank Final Rating Summary -->
+        <div class="mt-6 sm:mt-8 p-4 bg-ink border border-cap/40 rounded-xl text-center shadow-lg">
+            <p class="text-xs text-cap font-semibold">Final Capacitor Bank Rating Summary</p>
+            <p class="text-xs sm:text-base font-mono font-bold text-paper mt-1 leading-relaxed" id="finalRatingSummary">Required Total Rating: 0.00 kVAr | Phase Capacitance: 0.00 µF</p>
+        </div>
+
+        <!-- Harmonized Technical Legend Footer with Exact Color Scheme -->
+        <footer class="mt-6 pt-4 border-t border-line text-xs grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-dim">
+            <div><strong class="text-copper">kW / MW:</strong> Real active power doing useful mechanical work.</div>
+            <div><strong class="text-cap">kVAr / MVAr (Qc):</strong> Reactive power compensation injected by capacitors.</div>
+            <div><strong class="text-paper">kVA:</strong> Total apparent power flowing through system lines.</div>
+            <div><strong class="text-good">PF:</strong> Ratio of real power to apparent power (cos phi).</div>
+        </footer>
+    </div>
+
+    <!-- Calculation Script -->
+    <script>
+        function calculatePFC() {
+            const systemType = document.getElementById('systemType').value;
+            const activeInput = parseFloat(document.getElementById('activePower').value) || 0;
+            const activeUnit = document.getElementById('activeUnit').value;
+
+            const voltageInput = parseFloat(document.getElementById('voltage').value) || 415;
+            const voltageUnit = document.getElementById('voltageUnit').value;
+
+            const reactiveUnit = document.getElementById('reactiveUnit').value;
+            const freq = parseFloat(document.getElementById('frequency').value) || 50;
+            const pf1Input = parseFloat(document.getElementById('initialPf').value);
+
+            const targetPfInput = document.getElementById('targetPf');
+
+            // Enforce Rule: Target PF must not go below Initial PF and must start from at least 0.85
+            const minAllowedTarget = Math.max(0.85, pf1Input);
+            targetPfInput.min = minAllowedTarget;
+
+            let pf2Input = parseFloat(targetPfInput.value);
+            if (pf2Input < minAllowedTarget) {
+                pf2Input = minAllowedTarget;
+                targetPfInput.value = pf2Input;
+            }
+
+            const pf1 = pf1Input;
+            const pf2 = pf2Input;
+
+            document.getElementById('initialPfVal').innerText = pf1;
+            document.getElementById('targetPfVal').innerText = pf2;
+
+            if (systemType === '3phase') {
+                document.getElementById('voltageLabel').innerText = "System Voltage (Line to Line)";
+            } else {
+                document.getElementById('voltageLabel').innerText = "System Voltage (Phase to Neutral)";
+            }
+
+            // Normalize Active Power P to Kilowatts (kW)
+            let P_kW = activeInput;
+            if (activeUnit === 'mw') {
+                P_kW = activeInput * 1000.0;
+            }
+
+            // Normalize Voltage V to Volts (V)
+            let V_volts = voltageInput;
+            if (voltageUnit === 'kv') {
+                V_volts = voltageInput * 1000.0;
+            }
+
+            const phi1 = Math.acos(pf1);
+            const phi2 = Math.acos(pf2);
+
+            const kvarTotalBase = P_kW * (Math.tan(phi1) - Math.tan(phi2));
+            const q1Base = P_kW * Math.tan(phi1);
+            const q2Base = P_kW * Math.tan(phi2);
+
+            const kvaInitial = P_kW / pf1;
+            const kvaTarget = P_kW / pf2;
+
+            let currentInitial = 0;
+            let currentTarget = 0;
+            let kvarPerPhaseBase = 0;
+
+            if (systemType === '3phase') {
+                currentInitial = (P_kW * 1000) / (Math.sqrt(3) * V_volts * pf1);
+                currentTarget = (P_kW * 1000) / (Math.sqrt(3) * V_volts * pf2);
+                kvarPerPhaseBase = kvarTotalBase / 3.0;
+            } else {
+                currentInitial = (P_kW * 1000) / (V_volts * pf1);
+                currentTarget = (P_kW * 1000) / (V_volts * pf2);
+                kvarPerPhaseBase = kvarTotalBase;
+            }
+
+            // Apply Reactive Unit Scale (kVAr vs MVAr) for displays
+            let displayKvarTotal = kvarTotalBase;
+            let displayQ1 = q1Base;
+            let displayQ2 = q2Base;
+            let reactiveUnitLabel = "kVAr";
+
+            if (reactiveUnit === 'mvar') {
+                displayKvarTotal = kvarTotalBase / 1000.0;
+                displayQ1 = q1Base / 1000.0;
+                displayQ2 = q2Base / 1000.0;
+                reactiveUnitLabel = "MVAr";
+            }
+
+            const capacitanceMicrofarads = (kvarPerPhaseBase * 1e9) / (2 * Math.PI * freq * Math.pow(V_volts, 2));
+
+            // Update Performance metrics
+            document.getElementById('resInitialCurrent').innerText = currentInitial.toFixed(2) + " A";
+            document.getElementById('resTargetCurrent').innerText = currentTarget.toFixed(2) + " A";
+            document.getElementById('resTotalKvar').innerText = `${displayKvarTotal.toFixed(2)} ${reactiveUnitLabel}`;
+            document.getElementById('resCapacitance').innerText = capacitanceMicrofarads.toFixed(2) + " µF";
+
+            // Update Digital Glass Meters
+            let pDisplayVal = activeInput;
+            let pDisplayUnit = activeUnit.toUpperCase();
+            document.getElementById('meterBeforeP').innerText = `${pDisplayVal} ${pDisplayUnit}`;
+            document.getElementById('meterAfterP').innerText = `${pDisplayVal} ${pDisplayUnit}`;
+            document.getElementById('meterBeforeQ').innerText = `${displayQ1.toFixed(2)} ${reactiveUnitLabel}`;
+            document.getElementById('meterAfterQ').innerText = `${displayQ2.toFixed(2)} ${reactiveUnitLabel}`;
+            document.getElementById('meterBeforeS').innerText = `${(kvaInitial / (activeUnit === 'mw' ? 1000 : 1)).toFixed(2)} kVA`;
+            document.getElementById('meterAfterS').innerText = `${(kvaTarget / (activeUnit === 'mw' ? 1000 : 1)).toFixed(2)} kVA`;
+            document.getElementById('meterBeforePF').innerText = pf1;
+            document.getElementById('meterAfterPF').innerText = pf2;
+
+            // Update bottom summary line (Farads removed)
+            document.getElementById('finalRatingSummary').innerText =
+                `Required Total Rating: ${displayKvarTotal.toFixed(2)} ${reactiveUnitLabel} | Phase Capacitance: ${capacitanceMicrofarads.toFixed(2)} µF`;
+
+            // Update active power label on SVG triangle axis dynamically
+            document.getElementById('svgActiveLabel').innerText = `Active Power (${pDisplayUnit}: ${activeInput})`;
+
+            // Power Triangle Geometry Calculation
+            const maxAllowedHeight = 110;
+            const scaleFactor = maxAllowedHeight / Math.max(q1Base, 1);
+
+            const q1HeightPx = q1Base * scaleFactor;
+            const q2HeightPx = q2Base * scaleFactor;
+
+            const startX = 40;
+            const startY = 150;
+            const baseWidthPx = 200;
+            const tipX = startX + baseWidthPx;
+            const qc_X = tipX + 45;
+
+            const tipY_Q1 = startY - q1HeightPx;
+            const tipY_Q2 = startY - q2HeightPx;
+
+            document.getElementById('svgQ1Line').setAttribute('x1', tipX);
+            document.getElementById('svgQ1Line').setAttribute('x2', tipX);
+            document.getElementById('svgQ1Line').setAttribute('y1', startY);
+            document.getElementById('svgQ1Line').setAttribute('y2', tipY_Q1);
+
+            document.getElementById('svgQ2Line').setAttribute('x1', tipX);
+            document.getElementById('svgQ2Line').setAttribute('x2', tipX);
+            document.getElementById('svgQ2Line').setAttribute('y1', startY);
+            document.getElementById('svgQ2Line').setAttribute('y2', tipY_Q2);
+
+            document.getElementById('svgQcLine').setAttribute('x1', qc_X);
+            document.getElementById('svgQcLine').setAttribute('x2', qc_X);
+            document.getElementById('svgQcLine').setAttribute('y1', tipY_Q1);
+            document.getElementById('svgQcLine').setAttribute('y2', tipY_Q2);
+
+            document.getElementById('svgQcCapTop').setAttribute('x1', qc_X - 5);
+            document.getElementById('svgQcCapTop').setAttribute('x2', qc_X + 5);
+            document.getElementById('svgQcCapTop').setAttribute('y1', tipY_Q1);
+            document.getElementById('svgQcCapTop').setAttribute('y2', tipY_Q1);
+
+            document.getElementById('svgQcCapBot').setAttribute('x1', qc_X - 5);
+            document.getElementById('svgQcCapBot').setAttribute('x2', qc_X + 5);
+            document.getElementById('svgQcCapBot').setAttribute('y1', tipY_Q2);
+            document.getElementById('svgQcCapBot').setAttribute('y2', tipY_Q2);
+
+            document.getElementById('svgS1Line').setAttribute('x1', startX);
+            document.getElementById('svgS1Line').setAttribute('y1', startY);
+            document.getElementById('svgS1Line').setAttribute('x2', tipX);
+            document.getElementById('svgS1Line').setAttribute('y2', tipY_Q1);
+
+            document.getElementById('svgS2Line').setAttribute('x1', startX);
+            document.getElementById('svgS2Line').setAttribute('y1', startY);
+            document.getElementById('svgS2Line').setAttribute('x2', tipX);
+            document.getElementById('svgS2Line').setAttribute('y2', tipY_Q2);
+        }
+
+        window.onload = calculatePFC;
+    </script>
+</body>
+</html>
